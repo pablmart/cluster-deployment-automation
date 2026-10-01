@@ -41,7 +41,7 @@ class NFS:
 
     def _add(self, dir_name: str) -> None:
         contents = self._host.read_file("/etc/exports")
-        self._host.write("/etc/exports", f"{contents}\n{dir_name}")
+        self._host.write("/etc/exports", f"{contents}\n{dir_name} *(rw,sync,no_root_squash)")
 
     def _export_fs(self) -> None:
         self._host.run("systemctl enable nfs-server")
