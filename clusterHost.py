@@ -149,7 +149,28 @@ class ClusterHost:
 
         if interface.master is None:
             logger.info(f"No master set for interface {self.api_port}, setting it to {br_name}")
+            # Capture IP/gateway before enslaving so we can preserve host reachability
+            import re as _re
+            addr_out = self.hostconn.run(f"ip -4 addr show {self.api_port}").out
+            route_out = self.hostconn.run(f"ip route show default dev {self.api_port}").out
+            ip_cidr = None
+            gateway = None
+            m = _re.search(r'inet (\S+)', addr_out)
+            if m:
+                ip_cidr = m.group(1)
+            m = _re.search(r'via (\S+)', route_out)
+            if m:
+                gateway = m.group(1)
+
             self.hostconn.run(f"ip link set {self.api_port} master {br_name}")
+
+            # Move IP and default route to virbr0 so host stays reachable
+            if ip_cidr:
+                self.hostconn.run(f"ip addr add {ip_cidr} dev {br_name}")
+                logger.info(f"Moved {ip_cidr} from {self.api_port} to {br_name}")
+            if gateway:
+                self.hostconn.run(f"ip route add default via {gateway} dev {br_name}")
+                logger.info(f"Set default route via {gateway} on {br_name}")
         elif interface.master != br_name:
             logger.error_and_exit(f"Incorrect master set for interface {self.api_port}")
 
